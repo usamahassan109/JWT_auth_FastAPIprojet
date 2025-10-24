@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Account Activation</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        color: #333;
+        background-color: #f8f9fa;
+        padding: 20px;
+      }
+      .email-container {
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #fff;
+        border-radius: 8px;
+        padding: 20px 30px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #007bff;
+        text-align: center;
+      }
+      p {
+        font-size: 16px;
+        line-height: 1.6;
+      }
+      .button {
+        display: inline-block;
+        color: #fff !important;
+        background-color: #007bff;
+        border-radius: 6px;
+        text-decoration: none;
+        padding: 10px 20px;
+        font-size: 16px;
+        text-align: center;
+        margin: 20px 0;
+      }
+      .button:hover {
+        background-color: #0056b3;
+      }
+      .footer {
+        margin-top: 20px;
+        font-size: 14px;
+        color: #666;
+        text-align: center;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="email-container">
+      <h1>Welcome to {{ app_name }}</h1>
+
+      <p>Dear {{ name }},</p>
+
+      <p>
+        Thank you for signing up. Please activate your account by clicking the
+        button below:
+      </p>
+
+      <p style="text-align: center">
+        <a href="{{ activate_url }}" class="button">Activate Account</a>
+      </p>
+
+      <p>
+        If the button above doesn't work, please copy and paste the following
+        link into your browser:
+      </p>
+
+      <p>
+        <a href="{{ activate_url }}">{{ activate_url }}</a>
+      </p>
+
+      <div class="footer">
+        <p>Best regards,<br />{{ app_name }} Team</p>
+      </div>
+    </div>
+  </body>
+</html>

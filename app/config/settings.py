@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     APP_NAME:  str = os.environ.get("APP_NAME", "FastAPI")
     DEBUG: bool = bool(os.environ.get("DEBUG", False))
 
+    #FrontEnd Application
+    FRONTEND_HOST:str= os.environ.get("MYSQL_HOST", 'http//localhost:3000')
+    
     # MySql Database Config
     MYSQL_HOST: str = os.environ.get("MYSQL_HOST", 'localhost')
     MYSQL_USER: str = os.environ.get("MYSQL_USER", 'root')
@@ -22,6 +25,9 @@ class Settings(BaseSettings):
     MYSQL_PORT: int = int(os.environ.get("MYSQL_PORT", 3306))
     MYSQL_DB: str = os.environ.get("MYSQL_DB", 'fastapi')
     DATABASE_URI: str = f"mysql+pymysql://{MYSQL_USER}:%s@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}" % quote_plus(MYSQL_PASS)
+
+
+    #JWT secret keys
 
     # App Secret Key
     SECRET_KEY: str = os.environ.get("SECRET_KEY", "8deadce9449770680910741063cd0a3fe0acb62a8978661f421bbcbb66dc41f1")
