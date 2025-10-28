@@ -1,49 +1,59 @@
-from fastapi import APIRouter,status,Depends,BackgroundTasks
-from app.responses.user import UserResponse
+from fastapi import APIRouter, status, Depends, BackgroundTasks, HTTPException
+from fastapi.security import OAuth2PasswordRequestForm  # ✅ FIX: Added missing import
 from sqlalchemy.orm import Session
+from app.responses.user import UserResponse, LoginResponse
+from app.schemas.user import RegisterUserRequest, VerifyAccountRequest
+from app.models.user import User
+from app.config.security import verify_password
+from app.utils.email_context import USER_VERIFY_ACCOUNT
 from app.config.database import get_session
-from app.schemas.user import RegisterUserRequest,verifyUserRequest
-from app.services import user # adjust path
-from fastapi.security import OAuth2PasswordBearer
-from app.responses.user import LoginResponse
-
-
+from app.services import user  # ✅ FIX: Added missing import
 
 user_router = APIRouter(
     prefix="/users",
-    tags = ["users"],
-    responses = {404:{"description":"not found"}}, 
-
+    tags=["users"],
 )
-#code for user egister the account
-@user_router.post("",status_code=status.HTTP_201_CREATED , response_model = UserResponse)
-async def register_User(data: RegisterUserRequest,background_tasks=BackgroundTasks, session: Session = Depends(get_session)):
-    return await user.create_user_account(data,session,background_tasks)
 
-#code for user verify the account
+guest_router = APIRouter(
+    prefix="/auth",
+    tags=["Auth"],
+)
 
-# @user_router.post("/verify",status_code=status.HTTP_200_OK)  # response_model = UserResponse is liye remove kiya q k hamy json file chaye idr
-# async def verify_User_Account(
-#     data: verifyUserRequest,
-#     background_tasks:BackgroundTasks,
-#     session: Session = Depends(get_session)):
-#     return await user.activate_user_account(data,session,background_tasks)
+# Registration - POST /users
+@user_router.post("", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
+async def register_user(data: RegisterUserRequest, background_tasks=BackgroundTasks, session: Session = Depends(get_session)):
+    return await user.create_user_account(data, session, background_tasks)  # ✅ FIX: Now 'user' is imported
 
-
-#route define for verification the aaccount
+# Verification - POST /users/verify
 @user_router.post("/verify", status_code=status.HTTP_200_OK)
-async def verify_User_Account(
-    data: verifyUserRequest,
-    background_tasks: BackgroundTasks,
+async def verify_user_account(
+    data: VerifyAccountRequest,  # ✅ FIX: Changed from verifyUserRequest to VerifyAccountRequest
     session: Session = Depends(get_session)
 ):
-    await user.activate_user_account(data, session, background_tasks)
-    return JSONresponse({"message":"Account is verified successfully"})
+    user_obj = session.query(User).filter(User.email == data.email).first()
+    if not user_obj:
+        raise HTTPException(status_code=400, detail="Invalid email")
+    if user_obj.is_active:
+        raise HTTPException(status_code=400, detail="Link already used")
+    
+    user_token = user_obj.get_context_string(context=USER_VERIFY_ACCOUNT)
+    try:
+        token_valid = verify_password(user_token, data.token)
+    except Exception:
+        token_valid = False
 
-    #route define for login the user aaccount
-@user_router.post("/login", status_code=status.HTTP_200_OK,response_model = LoginResponse)
+    if not token_valid:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+    user_obj.verified = True
+    user_obj.is_active = True
+    session.commit()
+    return {"message": "Account Verified Successfully"}  # ✅ FIX: Changed from JSONresponse to direct dictionary
+
+# Login - POST /auth/login
+@guest_router.post("/login", response_model=LoginResponse)
 async def login_user(
-    data: OAuth2PasswordBearer,
+    data: OAuth2PasswordRequestForm = Depends(),  # ✅ FIX: Now OAuth2PasswordRequestForm is imported
     session: Session = Depends(get_session)
 ):
     return await user.get_login_token(data, session)

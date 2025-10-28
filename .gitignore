@@ -1,2 +1,54 @@
 /venv
 /.idea
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+
+# Environment variables (IMPORTANT!)
+.env
+.env.*
+
+# Docker
+*.pid
+*.tar
+
+# Logs
+*.log
+
+# Pytest
+.pytest_cache/
+
+# MySQL dump files
+*.sql
+
+# Alembic migrations cache
+alembic/versions/*.pyc
+
+# Byte-compiled
+*.pyo
+*.pyd
+
+# Unit test / coverage reports
+htmlcov/
+.coverage
+coverage.xml
+.cache
+nosetests.xml
+pytest.xml
+
+# OS files
+.DS_Store
+Thumbs.db

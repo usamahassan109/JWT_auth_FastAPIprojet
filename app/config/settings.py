@@ -28,10 +28,14 @@ class Settings(BaseSettings):
 
 
     #JWT secret keys
+    MYSQL_HOST: str = os.environ.get("MYSQL_HOST", 'localhost')
 
     # App Secret Key
-    SECRET_KEY: str = os.environ.get("SECRET_KEY", "8deadce9449770680910741063cd0a3fe0acb62a8978661f421bbcbb66dc41f1")
-
+    JWT_SECRETS: str = os.environ.get("SECRET_KEY", "bd1389ff2b02f2a6903d129ff0d9a8c11a5512012fbe2470a76d7f8b35d33bf9")
+    JWT_ALGORITHM: str = os.environ.get("ACCESS_TOKEN_ALGORITHM","HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES",2)
+    REFRESH_TOKEN_EXPIRE_MINUTES: int = os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES",1440)
+    
 
 @lru_cache()
 def get_settings() -> Settings:

@@ -1,3 +1,145 @@
+# import sys
+# import os
+# from typing import Generator
+
+# import pytest
+# from sqlalchemy import create_engine
+# from sqlalchemy.orm import sessionmaker
+# from starlette.testclient import TestClient
+
+
+# sys.path.append (os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# from app.main import app
+# from app.config.database import Base, get_session
+# from app.models.user import User
+# from app.config.security import hash_password
+# from datetime import datetime
+# from app.config.email import fm
+
+
+# USER_NAME = "Usama Hassan"
+# USER_EMAIL = "usamahassan311@gmail.com"
+# USER_PASSWORD = "#Usama123"
+
+# engine = create_engine("sqlite:///./fastapi.db")
+# SessionTesting = sessionmaker(autocommit = False,autoflush = False, bind = engine)
+
+
+# @pytest.fixture
+# def test_session() -> Generator:
+#     session = SessionTesting()
+#     try:
+#         yield session
+#     finally:
+#         session.close()
+
+
+# @pytest.fixture(scope = "function")
+# def app_test():
+#     Base.metadata.create_all(bind = engine)
+#     yield app
+#     Base.metadata.drop_all(bind = engine)
+
+
+# @pytest.fixture(scope = "function")
+# def client (app_test, test_session):
+#     def _test_db():
+#         try:
+#             yield test_session
+#         finally:
+#             pass
+
+#     app_test.dependency_overrides[get_session] = _test_db
+#     fm.config.SUPPRESS_SEND = 1 # yee mail service disable krta ha taa k kiu b mail na nzr aye
+#     return TestClient (app_test)
+
+# @pytest.fixture(scope="function")
+# def user(test_session):
+#     model = User()
+#     model.name = USER_NAME
+#     model.email = USER_EMAIL
+#     model.password = hash_password(USER_PASSWORD)
+#     model.is_active = False
+#     model.updated_at=datetime.utcnow()
+#     test_session.add(model)      # ✅ fixed
+#     test_session.commit()        # ✅ fixed
+#     test_session.refresh(model)  # ✅ fixed
+#     return model
+
+# @pytest.fixture(scope="function")
+# def inactive_user(test_session):
+#     model = User()
+#     model.name = USER_NAME
+#     model.email = USER_EMAIL
+#     model.password = hash_password(USER_PASSWORD)
+#     model.is_active = True
+#     model.updated_at=datetime.utcnow()
+#     model.verified_at=datetime.utcnow()
+#     test_session.add(model)      # ✅ fixed
+#     test_session.commit()        # ✅ fixed
+#     test_session.refresh(model)  # ✅ fixed
+#     return model
+
+# #fixture for unverified user
+# @pytest.fixture(scope="function")
+# def unverified_user(test_session):
+#     model = User()
+#     model.name = USER_NAME
+#     model.email = USER_EMAIL
+#     model.password = hash_password(USER_PASSWORD)
+#     model.is_active = True
+#     model.updated_at=datetime.utcnow()
+#     test_session.add(model)      # ✅ fixed
+#     test_session.commit()        # ✅ fixed
+#     test_session.refresh(model)  # ✅ fixed
+#     return model
+
+# @pytest.fixture(scope="function")
+# def user(test_session):
+#     model = User(
+#         name=USER_NAME,
+#         email=USER_EMAIL,
+#         password=hash_password(USER_PASSWORD),
+#         is_active=True,
+#         verified_at=datetime.utcnow(),
+#         updated_at=datetime.utcnow(),
+#     )
+#     test_session.add(model)
+#     test_session.commit()
+#     test_session.refresh(model)
+#     return model
+
+# @pytest.fixture(scope="function")
+# def inactive_user(test_session):
+#     model = User(
+#         name="Inactive User",
+#         email="inactive@gmail.com",
+#         password=hash_password(USER_PASSWORD),
+#         is_active=False,
+#         updated_at=datetime.utcnow(),
+#     )
+#     test_session.add(model)
+#     test_session.commit()
+#     test_session.refresh(model)
+#     return model
+
+# @pytest.fixture(scope="function")
+# def unverified_user(test_session):
+#     model = User(
+#         name="Unverified User",
+#         email="unverified@gmail.com",
+#         password=hash_password(USER_PASSWORD),
+#         is_active=True,
+#         verified_at=None,
+#         updated_at=datetime.utcnow(),
+#     )
+#     test_session.add(model)
+#     test_session.commit()
+#     test_session.refresh(model)
+#     return model
+
+
 import sys
 import os
 from typing import Generator
@@ -7,8 +149,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from starlette.testclient import TestClient
 
-
-sys.path.append (os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.main import app
 from app.config.database import Base, get_session
@@ -17,13 +158,15 @@ from app.config.security import hash_password
 from datetime import datetime
 from app.config.email import fm
 
-
 USER_NAME = "Usama Hassan"
 USER_EMAIL = "usamahassan311@gmail.com"
 USER_PASSWORD = "#Usama123"
 
-engine = create_engine("sqlite:///./fastapi.db")
-SessionTesting = sessionmaker(autocommit = False,autoflush = False, bind = engine)
+engine = create_engine(
+    "sqlite:///./fastapi.db",
+    connect_args={"check_same_thread": False}
+)
+SessionTesting = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 @pytest.fixture
@@ -35,15 +178,15 @@ def test_session() -> Generator:
         session.close()
 
 
-@pytest.fixture(scope = "function")
+@pytest.fixture(scope="function")
 def app_test():
-    Base.metadata.create_all(bind = engine)
+    Base.metadata.create_all(bind=engine)
     yield app
-    Base.metadata.drop_all(bind = engine)
+    Base.metadata.drop_all(bind=engine)
 
 
-@pytest.fixture(scope = "function")
-def client (app_test, test_session):
+@pytest.fixture(scope="function")
+def client(app_test, test_session):
     def _test_db():
         try:
             yield test_session
@@ -51,46 +194,58 @@ def client (app_test, test_session):
             pass
 
     app_test.dependency_overrides[get_session] = _test_db
-    fm.config.SUPPRESS_SEND = 1 # yee mail service disable krta ha taa k kiu b mail na nzr aye
-    return TestClient (app_test)
+    fm.config.SUPPRESS_SEND = 1
+    return TestClient(app_test)
+
+
+# ✅ Correct Fixtures (No Duplicates)
+
+@pytest.fixture(scope="function")
+def user(test_session):
+    """Verified + Active User"""
+    model = User(
+        name=USER_NAME,
+        email=USER_EMAIL,
+        password=hash_password(USER_PASSWORD),
+        is_active=True,
+        verified_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+    test_session.add(model)
+    test_session.commit()
+    test_session.refresh(model)
+    return model
+
 
 @pytest.fixture(scope="function")
 def inactive_user(test_session):
-    model = User()
-    model.name = USER_NAME
-    model.email = USER_EMAIL
-    model.password = hash_password(USER_PASSWORD)
-    model.is_active = False
-    model.updated_at=datetime.utcnow()
-    test_session.add(model)      # ✅ fixed
-    test_session.commit()        # ✅ fixed
-    test_session.refresh(model)  # ✅ fixed
+    """Not Active User"""
+    model = User(
+        name="Inactive User",
+        email="inactive@gmail.com",
+        password=hash_password(USER_PASSWORD),
+        is_active=False,
+        verified_at=None,
+        updated_at=datetime.utcnow(),
+    )
+    test_session.add(model)
+    test_session.commit()
+    test_session.refresh(model)
     return model
 
-@pytest.fixture(scope="function")
-def inactive_user(test_session):
-    model = User()
-    model.name = USER_NAME
-    model.email = USER_EMAIL
-    model.password = hash_password(USER_PASSWORD)
-    model.is_active = True
-    model.updated_at=datetime.utcnow()
-    model.verified_at=datetime.utcnow()
-    test_session.add(model)      # ✅ fixed
-    test_session.commit()        # ✅ fixed
-    test_session.refresh(model)  # ✅ fixed
-    return model
 
-#fixture for unverified user
 @pytest.fixture(scope="function")
 def unverified_user(test_session):
-    model = User()
-    model.name = USER_NAME
-    model.email = USER_EMAIL
-    model.password = hash_password(USER_PASSWORD)
-    model.is_active = True
-    model.updated_at=datetime.utcnow()
-    test_session.add(model)      # ✅ fixed
-    test_session.commit()        # ✅ fixed
-    test_session.refresh(model)  # ✅ fixed
+    """Active but not Verified"""
+    model = User(
+        name="Unverified User",
+        email="unverified@gmail.com",
+        password=hash_password(USER_PASSWORD),
+        is_active=True,
+        verified_at=None,
+        updated_at=datetime.utcnow(),
+    )
+    test_session.add(model)
+    test_session.commit()
+    test_session.refresh(model)
     return model

@@ -1,9 +1,17 @@
 from passlib.context import CryptContext
 import base64
 from datetime import datetime,timedelta
+from app.config.settings import get_settings
+import jwt
+import logging
+from fastapi.security import OAuth2PasswordBearer
 
+
+
+
+settings = get_settings()
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 def hash_password(password: str):
     return pwd_context.hash(password)
 
@@ -37,7 +45,7 @@ def str_decode(string:str)-> str:
 
 def get_token_payload(token: str,secret: str,algo: str):
     try:
-        payload = jwt.decode(token,secret,algorithms=algo)
+        payload = jwt.decode(token,secret,algorithms=[algo])
     except Exception as jwt_exec:
         logging.debug(f"jwt error:{str(jwt_exec)}")
         payload = None
@@ -48,18 +56,19 @@ def generate_token(payload:dict,secret:str,algo:str,expiry:timedelta):
     payload.update({"exp":expire})
     return jwt.encode(payload,secret,algorithm=algo)
 
-def generate_token_user(token:str,session):
-    payload=get_token_payload(token,settings.JWT_SECRETS,JWT_ALGORITHM)
+async def generate_token_user(token:str,db):
+    payload = get_token_payload(token, settings.JWT_SECRET, settings.JWT_ALGORITHM)
     if payload:
-        user = await load_user(str_decode(payload.get('username')),session)
+        user = await load_user(str_decode(payload.get('username')),db)
     if user and user.id == int(payload.get('sub')):
         return user
+    return None
 
 async def load_user(email:str,session):
     from app.models.user import User
     try:
-        user = session.query(User).filter(user.email == email).first()
+        user = session.query(User).filter(User.email == email).first()
     except Exception as user_exec:
-        logging_info(f"user not found {email}")
+        logging.info(f"user not found {email}")
         user = None
     return user

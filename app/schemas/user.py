@@ -6,6 +6,12 @@ class RegisterUserRequest(BaseModel):
     password: str
 
 #verify the user request 
-class verifyUserRequest(BaseModel):
+from pydantic import BaseModel, EmailStr
+
+class VerifyAccountRequest(BaseModel):
     token: str
     email: EmailStr
+
+class LoginRequest(BaseModel):
+    username: str  # ya email: EmailStr agar specifically email use karna hai
+    password: str

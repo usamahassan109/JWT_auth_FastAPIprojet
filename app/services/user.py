@@ -1,59 +1,44 @@
+from sqlalchemy.orm import Session
 from app.models.user import User
-from app.config.security import hash_password,is_password_strong_enough,verify_password
+from app.config.security import hash_password, is_password_strong_enough, verify_password
 from fastapi import HTTPException
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.services.email import send_account_verification_email
 from app.utils.email_context import USER_VERIFY_ACCOUNT
 import logging
 from app.services.email import send_account_activation_confirmation_email
+from app.config.settings import get_settings
+from app.utils.string import unique_string
+from app.models.user import UserToken
+from app.config.security import generate_token
 
+settings = get_settings()
 
+# ✅ FIX 1: load_user function defined at top
+def load_user(email: str, session: Session):
+    return session.query(User).filter(User.email == email).first()
 
-
-
-
-async def create_user_account(data , session,background_tasks=None):
+async def create_user_account(data, session, background_tasks=None):
     user_exist = session.query(User).filter(User.email == data.email).first()
     if user_exist:
         raise HTTPException(status_code=400, detail="Email already registered")
     if not is_password_strong_enough(data.password):
         raise HTTPException(status_code=400, detail="Please Enter a strong Password")
 
-
     user = User()
-    user.name=data.name
-    user.email=data.email
-    user.password=hash_password(data.password) 
-    user.is_active=False
-    user.updated_at=datetime.utcnow()
+    user.name = data.name
+    user.email = data.email
+    user.password = hash_password(data.password) 
+    user.is_active = False
+    user.updated_at = datetime.utcnow()
     session.add(user)
     session.commit()
     session.refresh(user)
 
-#Account Varification Email=
-    await send_account_verification_email(user,background_tasks=background_tasks)
+    # Account Verification Email
+    await send_account_verification_email(user, background_tasks=background_tasks)
     return user
 
-# async def activate_user_account(data , session,background_tasks=None):
-#     user = session.query(User).filter(User.email == data.email).first()
-#     if not user:
-#         raise HTTPException(status_code=400, detail="This link is not valid")
-#     user_token=user.get_context_string(contexT=USER_VERIFY_ACCOUNT)
-#     try:
-#         token_valid = verify_password(user_token, data.token)  #verify_password(plain_password ,hashed_password) lkn is mn plain password hamara     user.token     ha or hashespassword hamara data ha jo uper diya gaya ha
-#     except Exception as verify_exes:
-#         logging.exception(verify_exes)
-#         token_valid = False
-#     if not token_valid:
-#         raise HTTPException(status_code=400, detail="This link either expired or not valid")
-
-#     user.is_active = True
-#     user.updated_at=datetime.utcnow()
-#     user.varify_at = datetime.utcnow()
-#     session.add(user)
-#     session.commit()
-#     session.refresh(user)
-#     return user
 async def activate_user_account(data, session, background_tasks=None):
     user = session.query(User).filter(User.email == data.email).first()
     if not user:
@@ -80,34 +65,80 @@ async def activate_user_account(data, session, background_tasks=None):
     session.commit()
     session.refresh(user)
     logging.info(f"Log 2 => {user.updated_at.strftime('%Y-%m-%d %H:%M:%S')}") 
-#activation confirmation email
-    await send_account_activation_confirmation_email(user,background_tasks)
+    
+    # activation confirmation email
+    await send_account_activation_confirmation_email(user, background_tasks)
     return user
 
-# ------------------------------------------------------------------------------
-
- 
-
-    #get logintiken
-async def get_login_token(data,session):
-# verify emain and password
-# verify user account is verify
-# verify user account is active 
-# generate access token and refresh token and ttl (note  yee ham pytest ke library JWT use kr k hasil kry gay
-      
-#step-1 first we check the email exist or not
-    # user = session.query(User).filter(User.email == data.email).first() #yee is liye comment kr diya neechy ham ny user jo token sy liya wo gmail k through lay liya ha
-    user = load_user(data.username,session)
-    if not user:
-         raise HTTPException(status_code=400, detail="Email is not valid register with us")
-#step-2 check password is valid or not
-    if not verify_password(data.password,user.password):
-        raise HTTPException(status_code=400, detail="invalid email and password")
-#step-3 Acout is not verified
-    if not user.verified:
-       raise HTTPException(status_code=400, detail="Your acount is not verifiedpleas cexck your email inbox to erify your account")
-#step-3 Acout is not active    
-    if not user.is_active:
-       raise HTTPException(status_code=400, detail="Your acount is deactibvated please conactwith support") 
-#Generate the JWT token          
+async def get_login_token(data, session):
+    # ✅ FIX 2: Support both OAuth2 form and direct data
+    if hasattr(data, 'username'):
+        email = data.username  # For OAuth2PasswordRequestForm
+    else:
+        email = data.email     # For direct data
     
+    # ✅ FIX 3: Use load_user function
+    user = load_user(email, session)
+    if not user:
+        raise HTTPException(status_code=400, detail="Email is not registered with us")
+
+    # step-2 check valid password
+    if not verify_password(data.password, user.password):
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+
+    # ✅ FIX 4: Check verified_at instead of verified
+    if not user.verified_at:
+        raise HTTPException(
+            status_code=400,
+            detail="Your account is not verified. Please check your email to verify your account"
+        )
+
+    # step-4 account active?
+    if not user.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="Your account is deactivated, please contact support"
+        )
+
+    return await _generate_tokens(session, user)
+
+async def _generate_tokens(session, user):
+    refresh_key = unique_string(100)
+    access_key = unique_string(50) 
+    rt_expires = timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+
+    user_token = UserToken()
+    user_token.user_id = user.id  # ✅ FIX 5: user.id without quotes
+    user_token.refresh_key = refresh_key
+    user_token.access_key = access_key
+    user_token.expires_at = datetime.utcnow() + rt_expires 
+    session.add(user_token)
+    session.commit()
+    session.refresh(user_token)
+
+    # ✅ FIX 6: Removed str_encode function
+    at_payload = {
+        "sub": str(user.id),  # Simple string conversion
+        "a": access_key,
+        "r": str(user_token.id),  # Simple string conversion
+        "n": user.name  # Direct string
+    }
+
+    at_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = generate_token(at_payload, settings.SECRET_KEY, settings.JWT_ALGORITHM)
+
+    # ✅ FIX 7: Removed str_encode function
+    rt_payload = {
+        "sub": str(user.id),  # Simple string conversion
+        "t": refresh_key,
+        "a": access_key
+    }
+    refresh_token = generate_token(rt_payload, settings.SECRET_KEY, settings.JWT_ALGORITHM)
+    
+    # ✅ FIX 8: Correct return dictionary syntax
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expire_in": at_expires.seconds
+    }
