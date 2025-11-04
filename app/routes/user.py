@@ -8,6 +8,7 @@ from app.config.security import verify_password
 from app.utils.email_context import USER_VERIFY_ACCOUNT
 from app.config.database import get_session
 from app.services import user  # ✅ FIX: Added missing import
+from datetime import datetime
 
 user_router = APIRouter(
     prefix="/users",
@@ -47,6 +48,7 @@ async def verify_user_account(
 
     user_obj.verified = True
     user_obj.is_active = True
+    user_obj.verified_at = datetime.utcnow() 
     session.commit()
     return {"message": "Account Verified Successfully"}  # ✅ FIX: Changed from JSONresponse to direct dictionary
 
