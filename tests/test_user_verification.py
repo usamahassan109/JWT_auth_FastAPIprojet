@@ -24,12 +24,25 @@ def test_user_account_verification(client,inactive_user,test_session): #here tes
         "email":inactive_user.email,
         "token":token  # yee token uper sy aya ha jo ham ny generate kiya ha
     }
-    response = client.post('users/verify',json=data)
+    response = client.post('/users/verify',json=data)
     assert response.status_code==200
-    #jab yee ho jay to ok kn ab ha sure nai k account verify ha yanai to am idr db sy phly data filter kry gay then kry gay run code
-    activated_user = test_session.query(User).filter(User.email == inactive_user.email).first()
-    assert activated_user.is_active is True
-    assert activated_user.verified_at is not None
+    # #jab yee ho jay to ok kn ab ha sure nai k account verify ha yanai to am idr db sy phly data filter kry gay then kry gay run code
+    # activated_user = test_session.query(User).filter(User.email == inactive_user.email).first()
+    # assert activated_user.is_active is True
+    # assert activated_user.verified_at is not None
+        # ✅ FORCE COMMIT AND REFRESH
+    test_session.commit()
+    test_session.expire_all()
+    
+    # ✅ DIRECT REFRESH OF THE SAME USER OBJECT
+    test_session.refresh(inactive_user)
+    
+    print(f"DEBUG: is_active: {inactive_user.is_active}")
+    print(f"DEBUG: verified_at: {inactive_user.verified_at}")
+    
+    assert inactive_user.is_active is True
+    assert inactive_user.verified_at is not None
+
 # -------------------------------------------------
     # 2-test activation valid one time
 def test_user_link_doesnot_work_twice(client,inactive_user): #here test session is used because we have no idea user is activated or not

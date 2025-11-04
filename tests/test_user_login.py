@@ -44,9 +44,9 @@ def test_user_login(client, user):
     data = {'username': user.email, 'password': USER_PASSWORD}
     response = client.post('/auth/login', data=data)
     assert response.status_code == 200
-    assert response.json()['access token']
-    assert response.json()['refresh token']
-    assert response.json()['expire in']
+    assert response.json()['access_token']
+    assert response.json()['refresh_token']
+    assert response.json()['expire_in']
 
 def test_user_login_incorrect_email(client):
     response = client.post('/auth/login', data={'username': 'wrong@example.com', 'password': USER_PASSWORD})

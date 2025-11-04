@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     MYSQL_HOST: str = os.environ.get("MYSQL_HOST", 'localhost')
 
     # App Secret Key
-    JWT_SECRETS: str = os.environ.get("SECRET_KEY", "bd1389ff2b02f2a6903d129ff0d9a8c11a5512012fbe2470a76d7f8b35d33bf9")
+    JWT_SECRET: str = os.environ.get("SECRET_KEY", "bd1389ff2b02f2a6903d129ff0d9a8c11a5512012fbe2470a76d7f8b35d33bf9")
     JWT_ALGORITHM: str = os.environ.get("ACCESS_TOKEN_ALGORITHM","HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES",2)
     REFRESH_TOKEN_EXPIRE_MINUTES: int = os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES",1440)

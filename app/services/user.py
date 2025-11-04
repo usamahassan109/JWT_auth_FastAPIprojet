@@ -43,7 +43,7 @@ async def activate_user_account(data, session, background_tasks=None):
     user = session.query(User).filter(User.email == data.email).first()
     if not user:
         raise HTTPException(status_code=400, detail="This link is not valid")
-    if user.is_active:
+    if user.is_active and user.verified_at:
         raise HTTPException(status_code=400, detail="This link has already been used")
     user_token = user.get_context_string(context=USER_VERIFY_ACCOUNT)
     logging.info(f"Log 1 => {user.updated_at.strftime('%Y-%m-%d %H:%M:%S')}") 
@@ -60,7 +60,8 @@ async def activate_user_account(data, session, background_tasks=None):
 
     user.is_active = True
     user.updated_at = datetime.utcnow()
-    user.verified_at = datetime.utcnow()
+    user.verified_at = True        # ✅ Required line added!
+    user.updated_at = datetime.utcnow()
     session.add(user)
     session.commit()
     session.refresh(user)
@@ -125,7 +126,7 @@ async def _generate_tokens(session, user):
     }
 
     at_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = generate_token(at_payload, settings.SECRET_KEY, settings.JWT_ALGORITHM)
+    access_token = generate_token(at_payload, settings.JWT_SECRET, settings.JWT_ALGORITHM,at_expires)
 
     # ✅ FIX 7: Removed str_encode function
     rt_payload = {
@@ -133,12 +134,14 @@ async def _generate_tokens(session, user):
         "t": refresh_key,
         "a": access_key
     }
-    refresh_token = generate_token(rt_payload, settings.SECRET_KEY, settings.JWT_ALGORITHM)
+    # refresh_token = generate_token(rt_payload, settings.JWT_SECRET, settings.JWT_ALGORITHM)
+    refresh_token = generate_token(rt_payload, settings.JWT_SECRET, settings.JWT_ALGORITHM, rt_expires)
+
     
     # ✅ FIX 8: Correct return dictionary syntax
     return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "expire_in": at_expires.seconds
-    }
+    "access_token": access_token,    # ✅ access_token
+    "refresh_token": refresh_token,  # ✅ refresh_token  
+    "token_type": "bearer",
+    "expire_in": at_expires.seconds
+}
