@@ -15,3 +15,11 @@ class VerifyAccountRequest(BaseModel):
 class LoginRequest(BaseModel):
     username: str  # ya email: EmailStr agar specifically email use karna hai
     password: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    token: str
+    new_password: str
