@@ -194,7 +194,9 @@ def client(app_test, test_session):
             pass
 
     app_test.dependency_overrides[get_session] = _test_db
+    
     fm.config.SUPPRESS_SEND = 1
+
     return TestClient(app_test)
 
 

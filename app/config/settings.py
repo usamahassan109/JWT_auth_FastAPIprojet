@@ -10,15 +10,14 @@ load_dotenv(dotenv_path=env_path)
 
 
 class Settings(BaseSettings):
-
     # App
-    APP_NAME:  str = os.environ.get("APP_NAME", "FastAPI")
+    APP_NAME: str = os.environ.get("APP_NAME", "FastAPI")
     DEBUG: bool = bool(os.environ.get("DEBUG", False))
 
-    #FrontEnd Application
-    FRONTEND_HOST:str= os.environ.get("MYSQL_HOST", 'http//localhost:3000')
-    
-    # MySql Database Config
+    # FrontEnd Application
+    FRONTEND_HOST: str = os.environ.get("FRONTEND_HOST", 'http://localhost:3000')
+
+    # MySQL Database Config
     MYSQL_HOST: str = os.environ.get("MYSQL_HOST", 'localhost')
     MYSQL_USER: str = os.environ.get("MYSQL_USER", 'root')
     MYSQL_PASS: str = os.environ.get("MYSQL_PASSWORD", 'secret')
@@ -26,16 +25,12 @@ class Settings(BaseSettings):
     MYSQL_DB: str = os.environ.get("MYSQL_DB", 'fastapi')
     DATABASE_URI: str = f"mysql+pymysql://{MYSQL_USER}:%s@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}" % quote_plus(MYSQL_PASS)
 
-
-    #JWT secret keys
-    MYSQL_HOST: str = os.environ.get("MYSQL_HOST", 'localhost')
-
-    # App Secret Key
+    # JWT Secret Keys
     JWT_SECRET: str = os.environ.get("SECRET_KEY", "bd1389ff2b02f2a6903d129ff0d9a8c11a5512012fbe2470a76d7f8b35d33bf9")
-    JWT_ALGORITHM: str = os.environ.get("ACCESS_TOKEN_ALGORITHM","HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES",2)
-    REFRESH_TOKEN_EXPIRE_MINUTES: int = os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES",1440)
-    
+    JWT_ALGORITHM: str = os.environ.get("ACCESS_TOKEN_ALGORITHM", "HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", 2))
+    REFRESH_TOKEN_EXPIRE_MINUTES: int = int(os.environ.get("REFRESH_TOKEN_EXPIRE_MINUTES", 1440))
+
 
 @lru_cache()
 def get_settings() -> Settings:

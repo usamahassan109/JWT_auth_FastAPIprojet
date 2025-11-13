@@ -1,147 +1,166 @@
+from fastapi import HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from app.models.user import User
-from app.config.security import hash_password, is_password_strong_enough, verify_password
-from fastapi import HTTPException
 from datetime import datetime, timedelta
-from app.services.email import send_account_verification_email
-from app.utils.email_context import USER_VERIFY_ACCOUNT
-import logging
-from app.services.email import send_account_activation_confirmation_email
+from app.models.user import User, UserToken
+from app.config.security import hash_password, verify_password, generate_token, str_decode, get_token_payload, is_password_strong_enough
+from app.services.email import send_account_verification_email, send_account_activation_confirmation_email
 from app.config.settings import get_settings
 from app.utils.string import unique_string
-from app.models.user import UserToken
-from app.config.security import generate_token
+from app.utils.email_context import USER_VERIFY_ACCOUNT
+import logging
 
 settings = get_settings()
 
-# ✅ FIX 1: load_user function defined at top
-def load_user(email: str, session: Session):
-    return session.query(User).filter(User.email == email).first()
-
-async def create_user_account(data, session, background_tasks=None):
+# -------------------------------
+# Registration
+# -------------------------------
+async def create_user_account(data, session: Session, background_tasks: BackgroundTasks = None):
     user_exist = session.query(User).filter(User.email == data.email).first()
     if user_exist:
         raise HTTPException(status_code=400, detail="Email already registered")
     if not is_password_strong_enough(data.password):
-        raise HTTPException(status_code=400, detail="Please Enter a strong Password")
+        raise HTTPException(status_code=400, detail="Please enter a strong password")
 
-    user = User()
-    user.name = data.name
-    user.email = data.email
-    user.password = hash_password(data.password) 
-    user.is_active = False
-    user.updated_at = datetime.utcnow()
+    user = User(
+        name=data.name,
+        email=data.email,
+        password=hash_password(data.password),
+        is_active=False,
+        updated_at=datetime.utcnow()
+    )
+
     session.add(user)
     session.commit()
     session.refresh(user)
 
-    # Account Verification Email
-    await send_account_verification_email(user, background_tasks=background_tasks)
+    await send_account_verification_email(user, background_tasks)
     return user
 
-async def activate_user_account(data, session, background_tasks=None):
-    user = session.query(User).filter(User.email == data.email).first()
-    if not user:
-        raise HTTPException(status_code=400, detail="This link is not valid")
-    if user.is_active and user.verified_at:
-        raise HTTPException(status_code=400, detail="This link has already been used")
-    user_token = user.get_context_string(context=USER_VERIFY_ACCOUNT)
-    logging.info(f"Log 1 => {user.updated_at.strftime('%Y-%m-%d %H:%M:%S')}") 
+# -------------------------------
+# Account Verification
+# -------------------------------
+async def activate_user_account(data, session: Session, background_tasks: BackgroundTasks = None):
+    user_obj = session.query(User).filter(User.email == data.email).first()
+    if not user_obj:
+        raise HTTPException(status_code=400, detail="Invalid link")
+    if user_obj.is_active:
+        raise HTTPException(status_code=400, detail="Link already used")
 
+    token_hash = user_obj.get_context_string(USER_VERIFY_ACCOUNT)
     try:
-        # plain_password = data.token, hashed_password = user_token
-        token_valid = verify_password(user_token, data.token) 
-    except Exception as verify_ex:
-        logging.exception(verify_ex)
-        token_valid = False
+        valid = verify_password(token_hash, data.token)
+    except:
+        valid = False
+    if not valid:
+        raise HTTPException(status_code=400, detail="Invalid token")
 
-    if not token_valid:
-        raise HTTPException(status_code=400, detail="This link either expired or not valid")
+    user_obj.is_active = True
+    user_obj.verified_at = datetime.utcnow()
+    user_obj.updated_at = datetime.utcnow()
 
-    user.is_active = True
-    user.updated_at = datetime.utcnow()
-    user.verified_at = True        # ✅ Required line added!
-    user.updated_at = datetime.utcnow()
-    session.add(user)
+    session.add(user_obj)
     session.commit()
-    session.refresh(user)
-    logging.info(f"Log 2 => {user.updated_at.strftime('%Y-%m-%d %H:%M:%S')}") 
-    
-    # activation confirmation email
-    await send_account_activation_confirmation_email(user, background_tasks)
-    return user
+    session.refresh(user_obj)
 
-async def get_login_token(data, session):
-    # ✅ FIX 2: Support both OAuth2 form and direct data
-    if hasattr(data, 'username'):
-        email = data.username  # For OAuth2PasswordRequestForm
-    else:
-        email = data.email     # For direct data
-    
-    # ✅ FIX 3: Use load_user function
-    user = load_user(email, session)
-    if not user:
-        raise HTTPException(status_code=400, detail="Email is not registered with us")
+    await send_account_activation_confirmation_email(user_obj, background_tasks)
+    return user_obj
 
-    # step-2 check valid password
-    if not verify_password(data.password, user.password):
-        raise HTTPException(status_code=400, detail="Invalid email or password")
+# -------------------------------
+# Login
+# -------------------------------
+async def get_login_token(data, session: Session):
+    email = data.username
+    user_obj = session.query(User).filter(User.email == email).first()
+    if not user_obj:
+        raise HTTPException(status_code=400, detail="Email not registered")
+    if not verify_password(data.password, user_obj.password):
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+    if not user_obj.verified_at:
+        raise HTTPException(status_code=400, detail="Account not verified")
+    if not user_obj.is_active:
+        raise HTTPException(status_code=400, detail="Account deactivated")
 
-    # ✅ FIX 4: Check verified_at instead of verified
-    if not user.verified_at:
-        raise HTTPException(
-            status_code=400,
-            detail="Your account is not verified. Please check your email to verify your account"
-        )
+    return _generate_tokens(session, user_obj)
 
-    # step-4 account active?
-    if not user.is_active:
-        raise HTTPException(
-            status_code=400,
-            detail="Your account is deactivated, please contact support"
-        )
+# -------------------------------
+# Refresh Token
+# -------------------------------
+async def get_refresh_token(refresh_token, session: Session):
+    token_payload = get_token_payload(refresh_token, settings.JWT_SECRET, settings.JWT_ALGORITHM)
+    if not token_payload:
+        raise HTTPException(status_code=404, detail="Invalid request")
+    refresh_key = token_payload.get("t")
+    access_key = token_payload.get("a")
+    user_id = str_decode(token_payload.get("sub"))
 
-    return await _generate_tokens(session, user)
+    user_token_obj = session.query(UserToken).filter(
+        UserToken.refresh_key == refresh_key,
+        UserToken.access_key == access_key,
+        UserToken.user_id == user_id,
+        UserToken.expires_at > datetime.utcnow()
+    ).first()
+    if not user_token_obj:
+        raise HTTPException(status_code=404, detail="Invalid or expired token")
 
-async def _generate_tokens(session, user):
+    user_token_obj.expires_at = datetime.utcnow() + timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+    session.add(user_token_obj)
+    session.commit()
+    return _generate_tokens(session, user_token_obj.user)
+
+# -------------------------------
+# Forgot Password
+# -------------------------------
+async def forgot_password(data, session: Session, background_tasks: BackgroundTasks):
+    user_obj = session.query(User).filter(User.email == data.email).first()
+    if not user_obj:
+        raise HTTPException(status_code=400, detail="User not found")
+
+    reset_token = hash_password(user_obj.get_context_string("USER_FORGOT_PASSWORD"))
+    await send_email(
+        recipients=[user_obj.email],
+        subject="Reset Your Password",
+        template_name="user/forgot-password.html",
+        context={"token": reset_token, "name": user_obj.name},
+        background_tasks=background_tasks
+    )
+    return {"message": "Password reset email sent successfully"}
+
+# -------------------------------
+# Reset Password
+# -------------------------------
+async def reset_password(data, session: Session):
+    user_obj = session.query(User).filter(User.email == data.email).first()
+    if not user_obj:
+        raise HTTPException(status_code=400, detail="Invalid email")
+    if not verify_password(user_obj.get_context_string("USER_FORGOT_PASSWORD"), data.token):
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    user_obj.password = hash_password(data.new_password)
+    session.commit()
+    return {"message": "Password reset successful"}
+
+# -------------------------------
+# Generate Access & Refresh Tokens
+# -------------------------------
+def _generate_tokens(session, user_obj):
+    from app.utils.string import unique_string
     refresh_key = unique_string(100)
-    access_key = unique_string(50) 
+    access_key = unique_string(50)
     rt_expires = timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
 
-    user_token = UserToken()
-    user_token.user_id = user.id  # ✅ FIX 5: user.id without quotes
-    user_token.refresh_key = refresh_key
-    user_token.access_key = access_key
-    user_token.expires_at = datetime.utcnow() + rt_expires 
-    session.add(user_token)
+    user_token_obj = UserToken(
+        user_id=user_obj.id,
+        refresh_key=refresh_key,
+        access_key=access_key,
+        expires_at=datetime.utcnow() + rt_expires
+    )
+    session.add(user_token_obj)
     session.commit()
-    session.refresh(user_token)
+    session.refresh(user_token_obj)
 
-    # ✅ FIX 6: Removed str_encode function
-    at_payload = {
-        "sub": str(user.id),  # Simple string conversion
-        "a": access_key,
-        "r": str(user_token.id),  # Simple string conversion
-        "n": user.name  # Direct string
-    }
-
-    at_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = generate_token(at_payload, settings.JWT_SECRET, settings.JWT_ALGORITHM,at_expires)
-
-    # ✅ FIX 7: Removed str_encode function
-    rt_payload = {
-        "sub": str(user.id),  # Simple string conversion
-        "t": refresh_key,
-        "a": access_key
-    }
-    # refresh_token = generate_token(rt_payload, settings.JWT_SECRET, settings.JWT_ALGORITHM)
+    at_payload = {"sub": str(user_obj.id), "a": access_key, "r": str(user_token_obj.id), "n": user_obj.name}
+    access_token = generate_token(at_payload, settings.JWT_SECRET, settings.JWT_ALGORITHM, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    rt_payload = {"sub": str(user_obj.id), "t": refresh_key, "a": access_key}
     refresh_token = generate_token(rt_payload, settings.JWT_SECRET, settings.JWT_ALGORITHM, rt_expires)
 
-    
-    # ✅ FIX 8: Correct return dictionary syntax
-    return {
-    "access_token": access_token,    # ✅ access_token
-    "refresh_token": refresh_token,  # ✅ refresh_token  
-    "token_type": "bearer",
-    "expire_in": at_expires.seconds
-}
+    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer", "expire_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60}
