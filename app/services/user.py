@@ -8,6 +8,8 @@ from app.config.settings import get_settings
 from app.utils.string import unique_string
 from app.utils.email_context import USER_VERIFY_ACCOUNT
 import logging
+from app.config.security import str_encode
+
 
 settings = get_settings()
 
@@ -91,7 +93,9 @@ async def get_refresh_token(refresh_token, session: Session):
         raise HTTPException(status_code=404, detail="Invalid request")
     refresh_key = token_payload.get("t")
     access_key = token_payload.get("a")
-    user_id = str_decode(token_payload.get("sub"))
+    # user_id = str_decode(token_payload.get("sub"))
+    user_id = int(str_decode(token_payload.get("sub")))
+
 
     user_token_obj = session.query(UserToken).filter(
         UserToken.refresh_key == refresh_key,
@@ -158,9 +162,27 @@ def _generate_tokens(session, user_obj):
     session.commit()
     session.refresh(user_token_obj)
 
-    at_payload = {"sub": str(user_obj.id), "a": access_key, "r": str(user_token_obj.id), "n": user_obj.name}
-    access_token = generate_token(at_payload, settings.JWT_SECRET, settings.JWT_ALGORITHM, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
-    rt_payload = {"sub": str(user_obj.id), "t": refresh_key, "a": access_key}
-    refresh_token = generate_token(rt_payload, settings.JWT_SECRET, settings.JWT_ALGORITHM, rt_expires)
+    at_payload = { 
+        "sub": str_encode(str(user_obj.id)),
+        "a": access_key,
+        "r": str(user_token_obj.id),
+        "n": user_obj.name
+        }
+    access_token = generate_token(
+        at_payload,
+        settings.JWT_SECRET,
+        settings.JWT_ALGORITHM,
+        timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    rt_payload = {
+        "sub": str_encode(str(user_obj.id)),
+        "t": refresh_key,
+        "a": access_key
+        }
+    refresh_token = generate_token(
+        rt_payload,
+        settings.JWT_SECRET,
+        settings.JWT_ALGORITHM,
+        rt_expires
+        )
 
     return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer", "expire_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60}

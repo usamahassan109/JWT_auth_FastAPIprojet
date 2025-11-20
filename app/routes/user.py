@@ -37,6 +37,7 @@ async def login_user(data: OAuth2PasswordRequestForm = Depends(), session: Sessi
 # Refresh Token Route
 # -------------------------------
 @guest_router.post("/refresh", response_model=LoginResponse)
+# async def refresh_token(refresh_token: str = Header(..., alias="refresh-token"), session: Session = Depends(get_session)):
 async def refresh_token(refresh_token: str = Header(..., alias="refresh-token"), session: Session = Depends(get_session)):
     return await user.get_refresh_token(refresh_token, session)
 
