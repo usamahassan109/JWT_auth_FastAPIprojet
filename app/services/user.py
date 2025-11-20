@@ -9,6 +9,8 @@ from app.utils.string import unique_string
 from app.utils.email_context import USER_VERIFY_ACCOUNT
 import logging
 from app.config.security import str_encode
+from app.services.email import send_password_reset_email
+from app.config.security import load_user
 
 
 settings = get_settings()
@@ -186,3 +188,17 @@ def _generate_tokens(session, user_obj):
         )
 
     return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer", "expire_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60}
+
+
+#forgot password
+async def email_forgot_password_link(data, session, background_tasks):
+    user = await load_user(data.email, session)
+    if not user.verified_at:
+        raise HTTPException(status_code=400, detail="Your Account is not verified")
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Your Account is deactivated") 
+    await send_password_reset_email(user, background_tasks)
+    return {"message": "Password reset link sent successfully"}
+
+
+
