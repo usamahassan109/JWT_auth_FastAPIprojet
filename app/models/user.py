@@ -24,6 +24,9 @@ class User(Base):
             if self.updated_at else datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
         )
         return f"{context}{password_last_6}{updated_time}"
+    # def get_context_string(self, context: str):
+    #     return f"{context}{self.password[_6]}{self.updated_at.strftime('%Y-%m-%d %H:%M:%S')}"
+
 
 
 class UserToken(Base):

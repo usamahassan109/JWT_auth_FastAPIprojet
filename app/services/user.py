@@ -7,11 +7,11 @@ from app.services.email import send_account_verification_email, send_account_act
 from app.config.settings import get_settings
 from app.utils.string import unique_string
 from app.utils.email_context import USER_VERIFY_ACCOUNT
+from app.utils.forgot_password import FORGOT_PASSWORD
 import logging
-from app.config.security import str_encode
+from app.config.security import str_encode,hash_password
 from app.services.email import send_password_reset_email
 from app.config.security import load_user
-
 
 settings = get_settings()
 
@@ -121,7 +121,7 @@ async def forgot_password(data, session: Session, background_tasks: BackgroundTa
     if not user_obj:
         raise HTTPException(status_code=400, detail="User not found")
 
-    reset_token = hash_password(user_obj.get_context_string("USER_FORGOT_PASSWORD"))
+    reset_token = hash_password(user_obj.get_context_string("FORGOT_PASSWORD"))
     await send_email(
         recipients=[user_obj.email],
         subject="Reset Your Password",
@@ -199,6 +199,32 @@ async def email_forgot_password_link(data, session, background_tasks):
         raise HTTPException(status_code=400, detail="Your Account is deactivated") 
     await send_password_reset_email(user, background_tasks)
     return {"message": "Password reset link sent successfully"}
+
+#reset password
+async def email_reset_password(data, session):
+    user = await load_user(data.email, session)
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid Request")
+    if not user.verified_at:
+        raise HTTPException(status_code=400, detail="Invalid Request")
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Invalid Request") 
+    token_hash = user.get_context_string(context=FORGOT_PASSWORD)
+    try:
+        valid = verify_password(token_hash, data.token)
+    except:
+        valid = False
+    if not valid:
+        raise HTTPException(status_code=400, detail="Invalid window")
+    
+    user.password = hash_password(data.password)
+    user.updated_at = datetime.utcnow()  
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    #notify user that password has been updated successfully
+
+
 
 
 
