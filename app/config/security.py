@@ -5,6 +5,11 @@ from app.config.settings import get_settings
 import jwt
 import logging
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import joinedload,Session
+from app.config.database import get_session
+from fastapi import HTTPException,Depends
+from app.models.user import UserToken, User
+
 
 
 
@@ -56,13 +61,30 @@ def generate_token(payload:dict,secret:str,algo:str,expiry:timedelta):
     payload.update({"exp":expire})
     return jwt.encode(payload,secret,algorithm=algo)
 
-async def generate_token_user(token:str,db):
+async def generate_token_user(token: str, db: Session):
     payload = get_token_payload(token, settings.JWT_SECRET, settings.JWT_ALGORITHM)
     if payload:
-        user = await load_user(str_decode(payload.get('username')),db)
-    if user and user.id == int(payload.get('sub')):
-        return user
+        user_token_id = payload.get("r")
+        user_id = int(str_decode(payload.get("sub")))
+        access_key = payload.get("a")
+
+        user_token_obj = (
+            db.query(UserToken)
+            .options(joinedload(UserToken.user))
+            .filter(
+                UserToken.id == user_token_id,
+                UserToken.access_key == access_key,
+                UserToken.user_id == user_id,
+                UserToken.expires_at > datetime.utcnow()
+            )
+            .first()
+        )
+
+        if user_token_obj:
+            return user_token_obj.user
+
     return None
+
 
 async def load_user(email:str,session):
     from app.models.user import User
@@ -72,3 +94,10 @@ async def load_user(email:str,session):
         logging.info(f"user not found {email}")
         user = None
     return user
+
+
+async def get_currunt_user(token : str = Depends(oauth2_scheme),db : Session = Depends(get_session)):
+    user = await generate_token_user(token = token,db = db)
+    if user:
+        return user
+    raise HTTPException(status_code=401, detail="Account not vauthorized")

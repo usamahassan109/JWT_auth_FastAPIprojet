@@ -1,5 +1,5 @@
 from fastapi import HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session,joinedload
 from datetime import datetime, timedelta
 from app.models.user import User, UserToken
 from app.config.security import hash_password, verify_password, generate_token, str_decode, get_token_payload, is_password_strong_enough
@@ -99,7 +99,7 @@ async def get_refresh_token(refresh_token, session: Session):
     user_id = int(str_decode(token_payload.get("sub")))
 
 
-    user_token_obj = session.query(UserToken).filter(
+    user_token_obj = session.query(UserToken).options(joinedload(UserToken.user)).filter(
         UserToken.refresh_key == refresh_key,
         UserToken.access_key == access_key,
         UserToken.user_id == user_id,
@@ -112,6 +112,7 @@ async def get_refresh_token(refresh_token, session: Session):
     session.add(user_token_obj)
     session.commit()
     return _generate_tokens(session, user_token_obj.user)
+    
 
 # -------------------------------
 # Forgot Password

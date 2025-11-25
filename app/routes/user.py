@@ -7,9 +7,11 @@ from app.models.user import User
 from app.config.database import get_session
 from app.services import user  # Service layer import
 from app.services.email import send_email  # For forgot password email
+from app.config.security import oauth2_scheme,get_currunt_user
 
 user_router = APIRouter(prefix="/users", tags=["users"])
 guest_router = APIRouter(prefix="/auth", tags=["Auth"])
+auth_router = APIRouter(prefix="/users", tags=["users"],responses = {404:{"description":"Not Found"}},dependencies = [Depends(oauth2_scheme),Depends(get_currunt_user)])
 
 # -------------------------------
 # Registration Route
@@ -56,3 +58,9 @@ async def forgot_password(data: EmailRequest, background_tasks: BackgroundTasks,
 async def reset_password(data: ResetPasswordRequest, session: Session = Depends(get_session)):
     return await user.email_reset_password(data, session)
     # return JSONRespose({"message": "Your Password Updated seccuessfully"})
+
+# Access Token User Token Route
+# -------------------------------
+@auth_router.get("/me", status_code=status.HTTP_200_OK,response_model=UserResponse)
+async def fetch_user(user= Depends(get_currunt_user)):
+    return user
