@@ -157,6 +157,7 @@ from app.models.user import User
 from app.config.security import hash_password
 from datetime import datetime
 from app.config.email import fm
+from app.services.user import _generate_tokens
 
 USER_NAME = "Usama Hassan"
 USER_EMAIL = "usamahassan311@gmail.com"
@@ -198,6 +199,22 @@ def client(app_test, test_session):
     fm.config.SUPPRESS_SEND = 1
 
     return TestClient(app_test)
+
+@pytest.fixture(scope="function")
+def auth_client(app_test, test_session,user):
+    def _test_db():
+        try:
+            yield test_session
+        finally:
+            pass
+
+    app_test.dependency_overrides[get_session] = _test_db
+    
+    fm.config.SUPPRESS_SEND = 1
+    data = _generate_tokens(test_session, user)
+    client = TestClient(app_test)
+    client.headers["Authorization"] = f"Bearer {data['access_token']}"
+    return client
 
 
 # ✅ Correct Fixtures (No Duplicates)

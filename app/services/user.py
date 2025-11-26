@@ -225,6 +225,15 @@ async def email_reset_password(data, session):
     session.refresh(user)
     #notify user that password has been updated successfully
 
+    #__________________________________________________________________
+    #fetch user detail code
+async def fetch_user_detail(pk , session):
+    user = session.query(User).filter(User.id == pk).first()
+    if user:
+        return user
+    raise HTTPException(status_code=400, detail="User does not exist")
+
+
 
 
 

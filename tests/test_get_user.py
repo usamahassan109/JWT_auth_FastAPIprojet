@@ -61,3 +61,10 @@ def test_fetch_me_invalid_token(client, user, test_session):
     assert response.status_code == 401
     assert 'email' not in response.json()
     assert 'id' not in response.json()
+#_______________________________________________________________________________________________________
+# -------------------- --------------------------------- =Test_fetch_User_detail_bY_User_id----------
+def test_fetch_user_detail_by_user_id(auth_client , user):
+    response = auth_client.get(f"/users/{user.id}")
+
+    assert response.status_code == 200
+    assert response.json()["email"] == user.email
